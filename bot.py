@@ -68,19 +68,22 @@ def callback_query(call):
 @bot.message_handler(commands=['tts'])
 def tts(message):
     chat_id = message.chat.id
-    if chat_id in voice_choice_states and voice_choice_states[chat_id]:
-        # Получение текущего количества символов из базы данных
-        current_characters = db.get_token_count(chat_id)
-
-        # Проверка, достаточно ли символов для обработки запроса
-        if current_characters < 20:
-            bot.send_message(chat_id, "Недостаточно символов. Озвучить текст невозможно")
-            return
-
-        bot.send_message(chat_id, "Пожалуйста, введите текст для синтеза речи:")
-        bot.register_next_step_handler(message, handle_text)
+    chosen_voice = db.get_chosen_voice(chat_id)
+    if chosen_voice:
+        bot.send_message(chat_id, f"Выбран голос: {chosen_voice}.")
     else:
         bot.send_message(chat_id, "Сначала выберите голос с помощью /choose_voice.")
+        return
+        # Получение текущего количества символов из базы данных
+    current_characters = db.get_token_count(chat_id)
+
+        # Проверка, достаточно ли символов для обработки запроса
+    if current_characters < 10:
+        bot.send_message(chat_id, "Недостаточно символов. Озвучить текст невозможно")
+        return
+
+    bot.send_message(chat_id, "Пожалуйста, введите текст для синтеза речи:")
+    bot.register_next_step_handler(message, handle_text)
 
 @bot.message_handler(commands=["symbols"])
 def symbols(message):
@@ -90,16 +93,22 @@ def symbols(message):
 
 def handle_text(message):
     chat_id = message.chat.id
-    if chat_id in chosen_voices and chosen_voices[chat_id]:
-        text = message.text
-        db.save_request(chat_id, text)
-        voice = list(chosen_voices[chat_id])[0] # Получаем выбранный голос
-        current_characters = db.get_token_count(chat_id)
-        success, audio_file_path = text_to_speech(text, voice, str(chat_id))
-        if success:
-            db.update_token_count(chat_id, current_characters - len(text))
-            bot.send_audio(chat_id, open(audio_file_path, 'rb'))
-        else:
-            bot.send_message(chat_id, "Ошибка при синтезе речи.")
+    text = message.text
+    db.save_request(chat_id, text)
+    current_characters = db.get_token_count(chat_id)
+    if current_characters - len(text) < 0: # проверка на то, что пользователь не уйдет в минус
+        bot.send_message(chat_id, "Ты перешел лимит своих токенов, сделай текст покороче")
+        return
+    if len(text) >= 100: # проверка на кол-во символов
+        bot.send_message(chat_id, "Ты написал текст длинне 100 символов, сделай текст покороче")
+        return
+    voice = db.get_chosen_voice(chat_id)
+    current_characters = db.get_token_count(chat_id)
+    success, audio_file_path = text_to_speech(text, voice, str(chat_id))
+    if success:
+        db.update_token_count(chat_id, current_characters - len(text))
+        bot.send_audio(chat_id, open(audio_file_path, 'rb'))
+    else:
+        bot.send_message(chat_id, "Ошибка при синтезе речи.")
 
 bot.polling()

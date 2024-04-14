@@ -35,7 +35,7 @@ class Database:
         self.cursor.execute("SELECT token_count FROM tokens WHERE chat_id = ?", (chat_id,))
         result = self.cursor.fetchone()
         if result:
-            return result[0]  # Возвращает количество символов для данного chat_id
+            return result[0]
         else:
             return None
 
@@ -50,6 +50,15 @@ class Database:
     def save_voice_choice(self, chat_id, voice_choice):
         self.cursor.execute("INSERT INTO voice_choices (chat_id, voice_choice) VALUES (?, ?)", (chat_id, voice_choice))
         self.conn.commit()
+
+    def get_chosen_voice(self, chat_id):
+        self.cursor.execute(
+            "SELECT voice_choice FROM voice_choices WHERE chat_id = ? ORDER BY choice_time DESC LIMIT 1", (chat_id,))
+        result = self.cursor.fetchone()
+        if result:
+            return result[0]
+        else:
+            return None
 
     def close(self):
         self.conn.close()
