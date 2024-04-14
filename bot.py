@@ -46,9 +46,9 @@ def callback_query(call):
         bot.send_message(chat_id, f"Выбран голос: {call.data}. Отправляю аудиофайл с выбранным голосом")
         try:
             if call.data == 'alena':
-                bot.send_audio(chat_id, open('alena.ogg', 'rb'))
+                bot.send_audio(chat_id, open('voices/alena.ogg', 'rb'))
             elif call.data == 'filipp':
-                bot.send_audio(chat_id, open('filipp.ogg', 'rb'))
+                bot.send_audio(chat_id, open('voices/filipp.ogg', 'rb'))
         except Exception as e:
             bot.send_message(chat_id, f"Ошибка при отправке аудиофайла: {str(e)}\nЕсли у вам есть Telegram Premium, включите отправку голосовых сообщений")
         return
