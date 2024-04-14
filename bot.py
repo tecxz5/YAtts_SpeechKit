@@ -3,6 +3,7 @@ from telebot import types
 import logging
 from config import TOKEN
 from tts import text_to_speech
+from database import Database
 
 # Настройка логирования
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -12,6 +13,9 @@ logger = logging.getLogger(__name__)
 bot = telebot.TeleBot(TOKEN)
 voice_choice_states = {}
 chosen_voices = {}
+
+db = Database()
+db.create_database()
 
 def create_voice_keyboard():
     keyboard = types.InlineKeyboardMarkup()
@@ -24,6 +28,7 @@ def create_voice_keyboard():
 def start(message):
     chat_id = message.chat.id
     user_name = message.from_user.first_name
+    db.add_user(chat_id)
     bot.send_message(chat_id, f"""
 Привет {user_name}! Это бот, который может превратить твой текст в аудиофайл(голосовое сообщение).
 Чтобы начать переводить текст в аудиофайл введи /tts
@@ -49,6 +54,7 @@ def callback_query(call):
         bot.delete_message(chat_id, call.message.message_id)
         bot.send_message(chat_id, f"Выбран голос: {call.data}. Отправляю аудиофайл с выбранным голосом")
         voice_choice_states[chat_id] = True
+        db.save_voice_choice(chat_id, call.data)
         chosen_voices[chat_id] = {call.data}
         try:
             if call.data == 'alena':
@@ -63,6 +69,14 @@ def callback_query(call):
 def tts(message):
     chat_id = message.chat.id
     if chat_id in voice_choice_states and voice_choice_states[chat_id]:
+        # Получение текущего количества символов из базы данных
+        current_characters = db.get_token_count(chat_id)
+
+        # Проверка, достаточно ли символов для обработки запроса
+        if current_characters < 20:
+            bot.send_message(chat_id, "Недостаточно символов. Озвучить текст невозможно")
+            return
+
         bot.send_message(chat_id, "Пожалуйста, введите текст для синтеза речи:")
         bot.register_next_step_handler(message, handle_text)
     else:
@@ -71,15 +85,19 @@ def tts(message):
 @bot.message_handler(commands=["symbols"])
 def symbols(message):
     chat_id = message.chat.id
-    bot.send_message(chat_id, "Команда позволяющая смотреть кол-во символов, пока заглушка")
+    symbols = db.get_token_count(chat_id)
+    bot.send_message(chat_id, f"Кол-во оставшихся у вас символов: {symbols}")
 
 def handle_text(message):
     chat_id = message.chat.id
     if chat_id in chosen_voices and chosen_voices[chat_id]:
         text = message.text
+        db.save_request(chat_id, text)
         voice = list(chosen_voices[chat_id])[0] # Получаем выбранный голос
+        current_characters = db.get_token_count(chat_id)
         success, audio_file_path = text_to_speech(text, voice, str(chat_id))
         if success:
+            db.update_token_count(chat_id, current_characters - len(text))
             bot.send_audio(chat_id, open(audio_file_path, 'rb'))
         else:
             bot.send_message(chat_id, "Ошибка при синтезе речи.")
