@@ -1,10 +1,17 @@
 import telebot
 from telebot import types
+import logging
 from config import TOKEN
 from tts import text_to_speech
 
+# Настройка логирования
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 bot = telebot.TeleBot(TOKEN)
 voice_choice_states = {}
+chosen_voices = {}
 
 def create_voice_keyboard():
     keyboard = types.InlineKeyboardMarkup()
@@ -42,6 +49,7 @@ def callback_query(call):
         bot.delete_message(chat_id, call.message.message_id)
         bot.send_message(chat_id, f"Выбран голос: {call.data}. Отправляю аудиофайл с выбранным голосом")
         voice_choice_states[chat_id] = True
+        chosen_voices[chat_id] = {call.data}
         try:
             if call.data == 'alena':
                 bot.send_audio(chat_id, open('voices/alena.ogg', 'rb'))
@@ -55,7 +63,6 @@ def callback_query(call):
 def tts(message):
     chat_id = message.chat.id
     if chat_id in voice_choice_states and voice_choice_states[chat_id]:
-        # Запрашиваем текст от пользователя
         bot.send_message(chat_id, "Пожалуйста, введите текст для синтеза речи:")
         bot.register_next_step_handler(message, handle_text)
     else:
@@ -66,16 +73,15 @@ def symbols(message):
     chat_id = message.chat.id
     bot.send_message(chat_id, "Команда позволяющая смотреть кол-во символов, пока заглушка")
 
-@bot.message_handler(func=lambda message: True)
 def handle_text(message):
     chat_id = message.chat.id
-    if chat_id in voice_choice_states and not voice_choice_states[chat_id]:
-        # Получаем текст из сообщения
+    if chat_id in chosen_voices and chosen_voices[chat_id]:
         text = message.text
-        # Здесь вы можете вызвать функцию text_to_speech с полученным текстом
-        # Например: success, audio_data = text_to_speech(text)
-        # Если успешно, отправляем аудиофайл
-        # bot.send_voice(chat_id=chat_id, voice=audio_data)
-        bot.send_message(chat_id, "Текст получен. Синтез речи...")
+        voice = list(chosen_voices[chat_id])[0] # Получаем выбранный голос
+        success, audio_file_path = text_to_speech(text, voice, str(chat_id))
+        if success:
+            bot.send_audio(chat_id, open(audio_file_path, 'rb'))
+        else:
+            bot.send_message(chat_id, "Ошибка при синтезе речи.")
 
 bot.polling()
