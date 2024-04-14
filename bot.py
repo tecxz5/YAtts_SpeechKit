@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 bot = telebot.TeleBot(TOKEN)
 voice_choice_states = {}
-chosen_voices = {}
 
 db = Database()
 db.create_database()
@@ -55,7 +54,6 @@ def callback_query(call):
         bot.send_message(chat_id, f"Выбран голос: {call.data}. Отправляю аудиофайл с выбранным голосом")
         voice_choice_states[chat_id] = True
         db.save_voice_choice(chat_id, call.data)
-        chosen_voices[chat_id] = {call.data}
         try:
             if call.data == 'alena':
                 bot.send_audio(chat_id, open('voices/alena.ogg', 'rb'))
