@@ -1,6 +1,7 @@
 import telebot
 from telebot import types
 from config import TOKEN
+from tts import text_to_speech
 
 bot = telebot.TeleBot(TOKEN)
 voice_choice_states = {}
@@ -50,11 +51,13 @@ def callback_query(call):
             bot.send_message(chat_id, f"Ошибка при отправке аудиофайла: {str(e)}\nЕсли у вам есть Telegram Premium, включите отправку голосовых сообщений")
         return
 
-@bot.message_handler(commands=["tts"])
+@bot.message_handler(commands=['tts'])
 def tts(message):
     chat_id = message.chat.id
     if chat_id in voice_choice_states and voice_choice_states[chat_id]:
-        bot.send_message(chat_id, "Команда tts выполнена.")
+        # Запрашиваем текст от пользователя
+        bot.send_message(chat_id, "Пожалуйста, введите текст для синтеза речи:")
+        bot.register_next_step_handler(message, handle_text)
     else:
         bot.send_message(chat_id, "Сначала выберите голос с помощью /choose_voice.")
 
@@ -62,5 +65,17 @@ def tts(message):
 def symbols(message):
     chat_id = message.chat.id
     bot.send_message(chat_id, "Команда позволяющая смотреть кол-во символов, пока заглушка")
+
+@bot.message_handler(func=lambda message: True)
+def handle_text(message):
+    chat_id = message.chat.id
+    if chat_id in voice_choice_states and not voice_choice_states[chat_id]:
+        # Получаем текст из сообщения
+        text = message.text
+        # Здесь вы можете вызвать функцию text_to_speech с полученным текстом
+        # Например: success, audio_data = text_to_speech(text)
+        # Если успешно, отправляем аудиофайл
+        # bot.send_voice(chat_id=chat_id, voice=audio_data)
+        bot.send_message(chat_id, "Текст получен. Синтез речи...")
 
 bot.polling()
